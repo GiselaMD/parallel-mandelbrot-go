@@ -15,8 +15,8 @@ const (
 
 	imgWidth  = 1024
 	imgHeight = 1024
-	maxIter   = 2000
-	samples   = 100
+	maxIter   = 3000
+	samples   = 200
 
 	ratio = float64(imgWidth) / float64(imgHeight)
 )
@@ -47,7 +47,9 @@ func main() {
 
 func render() {
 	for x := 0; x < imgWidth; x++ {
+		// para cada coluna: 1 go routine (thread - eu acho que o go se gerencia para nao rodar mais threads do que o SO permite)
 		go func(x int) {
+			// para cada ponto x,y processa a cor pelo mandelbrot
 			for y := 0; y < imgHeight; y++ {
 				var colorR, colorG, colorB int
 				for i := 0; i < samples; i++ {
@@ -62,6 +64,8 @@ func render() {
 				cr = uint8(float64(colorR) / float64(samples))
 				cg = uint8(float64(colorG) / float64(samples))
 				cb = uint8(float64(colorB) / float64(samples))
+
+				// desenha o pixel processado na imagem
 				img.SetRGBA(x, y, color.RGBA{R: cr, G: cg, B: cb, A: 255})
 			}
 		}(x)
