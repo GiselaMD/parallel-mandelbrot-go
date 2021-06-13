@@ -28,7 +28,11 @@ const (
 	ratio = float64(imgWidth) / float64(imgHeight)
 )
 
-var img *image.RGBA
+var (
+	img *image.RGBA
+	win *pixelgl.Window
+	err error
+)
 
 // func main() {
 // 	log.Println("Initial processing...")
@@ -50,32 +54,30 @@ var img *image.RGBA
 func run() {
 	log.Println("Initial processing...")
 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
-
 	cfg := pixelgl.WindowConfig{
 		Title:  "Pixel Rocks!",
 		Bounds: pixel.R(0, 0, imgWidth, imgHeight),
 		VSync:  true,
 	}
 
-	win, err := pixelgl.NewWindow(cfg)
+	win, err = pixelgl.NewWindow(cfg)
 	if err != nil {
 		panic(err)
 	}
-
-	// win.Clear(colornames.White)
-
 	log.Println("Rendering...")
 
 	drawBuffer := make(chan Pix)
 	render(drawBuffer)
 	draw(drawBuffer)
 
-	// go ...
+	log.Println("Done!")
 
 	for !win.Closed() {
+		pic := pixel.PictureDataFromImage(img)
+		sprite := pixel.NewSprite(pic, pic.Bounds())
+		sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
+		win.Update()
 	}
-
-	log.Println("Done!")
 }
 
 func main() {
@@ -83,10 +85,15 @@ func main() {
 }
 
 func draw(drawBuffer chan Pix) {
-	pic := pixel.PictureDataFromImage(img)
-	sprite := pixel.NewSprite(pic, pic.Bounds())
-	sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
-	win.Update()
+	for i := range drawBuffer {
+		img.SetRGBA(i.x, i.x, i.color)
+		// 	// img.SetRGBA(i.x, i.y, i.color)
+		// 	// pic := pixel.PictureDataFromImage(img)
+		// 	// sprite := pixel.NewSprite(pic, pic.Bounds())
+		// 	// sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
+		// 	// win.Update()
+		// 	// fmt.Println(i.color)
+	}
 }
 
 func render(drawBuffer chan Pix) {
@@ -116,8 +123,11 @@ func render(drawBuffer chan Pix) {
 					x: x, y: y, color: color.RGBA{R: cr, G: cg, B: cb, A: 255},
 				}
 			}
+
 		}(x, drawBuffer)
+
 	}
+	// close(drawBuffer)
 }
 
 func paint(r float64, iter int) color.RGBA {
