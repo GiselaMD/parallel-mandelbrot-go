@@ -10,9 +10,12 @@ import (
 )
 
 type Pix struct {
-	x     int
-	y     int
-	color color.RGBA
+	x int
+	y int
+	// color color.RGBA
+	cr uint8
+	cg uint8
+	cb uint8
 }
 
 const (
@@ -30,8 +33,6 @@ const (
 
 var (
 	img *image.RGBA
-	win *pixelgl.Window
-	err error
 )
 
 // func main() {
@@ -60,7 +61,7 @@ func run() {
 		VSync:  true,
 	}
 
-	win, err = pixelgl.NewWindow(cfg)
+	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -68,9 +69,7 @@ func run() {
 
 	drawBuffer := make(chan Pix)
 	render(drawBuffer)
-	draw(drawBuffer)
-
-	log.Println("Done!")
+	go draw(drawBuffer, win)
 
 	for !win.Closed() {
 		pic := pixel.PictureDataFromImage(img)
@@ -78,22 +77,25 @@ func run() {
 		sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
 		win.Update()
 	}
+
+	log.Println("Done!")
+
 }
 
 func main() {
 	pixelgl.Run(run)
 }
 
-func draw(drawBuffer chan Pix) {
+func draw(drawBuffer <-chan Pix, win *pixelgl.Window) {
 	for i := range drawBuffer {
-		img.SetRGBA(i.x, i.x, i.color)
-		// 	// img.SetRGBA(i.x, i.y, i.color)
-		// 	// pic := pixel.PictureDataFromImage(img)
-		// 	// sprite := pixel.NewSprite(pic, pic.Bounds())
-		// 	// sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
-		// 	// win.Update()
-		// 	// fmt.Println(i.color)
+		img.SetRGBA(i.x, i.y, color.RGBA{R: i.cr, G: i.cg, B: i.cb, A: 255})
+		// pic := pixel.PictureDataFromImage(img)
+		// sprite := pixel.NewSprite(pic, pic.Bounds())
+		// sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
+		// win.Update()
+		// fmt.Println(i)
 	}
+
 }
 
 func render(drawBuffer chan Pix) {
@@ -101,7 +103,7 @@ func render(drawBuffer chan Pix) {
 	for x := 0; x < imgWidth; x++ {
 		// para cada coluna: 1 go routine (thread - eu acho que o go se gerencia para nao rodar mais threads do que o SO permite)
 		// para cada ponto x,y processa a cor pelo mandelbrot
-		go func(x int, drawBuffer chan Pix) {
+		go func(x int, drawBuffer chan<- Pix) {
 			for y := 0; y < imgHeight; y++ {
 				var colorR, colorG, colorB int
 				for i := 0; i < samples; i++ {
@@ -120,7 +122,7 @@ func render(drawBuffer chan Pix) {
 				// desenha o pixel processado na imagem
 				// img.SetRGBA(x, y, color.RGBA{R: cr, G: cg, B: cb, A: 255})
 				drawBuffer <- Pix{
-					x: x, y: y, color: color.RGBA{R: cr, G: cg, B: cb, A: 255},
+					x, y, cr, cg, cb,
 				}
 			}
 
