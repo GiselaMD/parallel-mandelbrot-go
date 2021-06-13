@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"math"
 
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
@@ -22,10 +23,12 @@ const (
 	posY   = -1.2
 	height = 2.5
 
-	imgWidth  = 1024
-	imgHeight = 1024
+	imgWidth  = 800
+	imgHeight = 800
 	maxIter   = 3000
-	samples   = 200
+	samples   = 50
+
+	numBlocks = 16
 
 	ratio = float64(imgWidth) / float64(imgHeight)
 )
@@ -36,7 +39,7 @@ func run() {
 	log.Println("Initial processing...")
 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 	cfg := pixelgl.WindowConfig{
-		Title:  "Pixel Rocks!",
+		Title:  "Parallel Mandelbrot - PAD",
 		Bounds: pixel.R(0, 0, imgWidth, imgHeight),
 		VSync:  true,
 	}
@@ -75,35 +78,40 @@ func draw(drawBuffer <-chan Pix, win *pixelgl.Window) {
 
 func render(drawBuffer chan Pix) {
 	//TODO: dividir em seçoes a partir da quantidade de threads passada por parametro
-	for x := 0; x < imgWidth; x++ {
+	for i := 0; i < numBlocks; i++ {
 		// para cada coluna: 1 go routine (thread - eu acho que o go se gerencia para nao rodar mais threads do que o SO permite)
 		// para cada ponto x,y processa a cor pelo mandelbrot
-		go func(x int, drawBuffer chan<- Pix) {
-			for y := 0; y < imgHeight; y++ {
-				var colorR, colorG, colorB int
-				for i := 0; i < samples; i++ {
-					a := height*ratio*((float64(x)+RandFloat64())/float64(imgWidth)) + posX
-					b := height*((float64(y)+RandFloat64())/float64(imgHeight)) + posY
-					c := paint(mandelbrotIteraction(a, b, maxIter))
-					colorR += int(c.R)
-					colorG += int(c.G)
-					colorB += int(c.B)
-				}
-				var cr, cg, cb uint8
-				cr = uint8(float64(colorR) / float64(samples))
-				cg = uint8(float64(colorG) / float64(samples))
-				cb = uint8(float64(colorB) / float64(samples))
+		go func(i int, drawBuffer chan<- Pix) {
+			var sqrt = int(math.Sqrt(numBlocks))
+			// matrix width
+			for x := 0; x < i*(imgWidth/sqrt); x++ {
+				//matrix height
+				for y := 0; y < i*(imgHeight/sqrt); y++ {
+					var colorR, colorG, colorB int
+					for i := 0; i < samples; i++ {
+						a := height*ratio*((float64(x)+RandFloat64())/float64(imgWidth)) + posX
+						b := height*((float64(y)+RandFloat64())/float64(imgHeight)) + posY
+						c := pixelColor(mandelbrotIteraction(a, b, maxIter))
+						colorR += int(c.R)
+						colorG += int(c.G)
+						colorB += int(c.B)
+					}
+					var cr, cg, cb uint8
+					cr = uint8(float64(colorR) / float64(samples))
+					cg = uint8(float64(colorG) / float64(samples))
+					cb = uint8(float64(colorB) / float64(samples))
 
-				drawBuffer <- Pix{
-					x, y, cr, cg, cb,
+					drawBuffer <- Pix{
+						x, y, cr, cg, cb,
+					}
 				}
 			}
+		}(i, drawBuffer)
 
-		}(x, drawBuffer)
 	}
 }
 
-func paint(r float64, iter int) color.RGBA {
+func pixelColor(r float64, iter int) color.RGBA {
 	insideSet := color.RGBA{R: 0, G: 0, B: 0, A: 255}
 
 	// validar se está dentro do conjunto
