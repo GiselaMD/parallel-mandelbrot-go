@@ -10,9 +10,8 @@ import (
 )
 
 type Pix struct {
-	x int
-	y int
-	// color color.RGBA
+	x  int
+	y  int
 	cr uint8
 	cg uint8
 	cb uint8
@@ -31,26 +30,7 @@ const (
 	ratio = float64(imgWidth) / float64(imgHeight)
 )
 
-var (
-	img *image.RGBA
-)
-
-// func main() {
-// 	log.Println("Initial processing...")
-// 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
-
-// 	log.Println("Rendering...")
-
-// 	render()
-
-// 	log.Printf("Opening window size: [%v,%v]\n", imgWidth, imgHeight)
-
-// 	if err := ebiten.Run(update, imgWidth, imgHeight, 1, "Test PAD"); err != nil {
-// 		log.Println(err)
-// 	}
-
-// 	log.Println("Done!")
-// }
+var img *image.RGBA
 
 func run() {
 	log.Println("Initial processing...")
@@ -89,11 +69,6 @@ func main() {
 func draw(drawBuffer <-chan Pix, win *pixelgl.Window) {
 	for i := range drawBuffer {
 		img.SetRGBA(i.x, i.y, color.RGBA{R: i.cr, G: i.cg, B: i.cb, A: 255})
-		// pic := pixel.PictureDataFromImage(img)
-		// sprite := pixel.NewSprite(pic, pic.Bounds())
-		// sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
-		// win.Update()
-		// fmt.Println(i)
 	}
 
 }
@@ -119,17 +94,13 @@ func render(drawBuffer chan Pix) {
 				cg = uint8(float64(colorG) / float64(samples))
 				cb = uint8(float64(colorB) / float64(samples))
 
-				// desenha o pixel processado na imagem
-				// img.SetRGBA(x, y, color.RGBA{R: cr, G: cg, B: cb, A: 255})
 				drawBuffer <- Pix{
 					x, y, cr, cg, cb,
 				}
 			}
 
 		}(x, drawBuffer)
-
 	}
-	// close(drawBuffer)
 }
 
 func paint(r float64, iter int) color.RGBA {
