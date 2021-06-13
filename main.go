@@ -5,8 +5,15 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/hajimehoshi/ebiten"
+	"github.com/faiface/pixel"
+	"github.com/faiface/pixel/pixelgl"
 )
+
+type Pix struct {
+	x     int
+	y     int
+	color color.RGBA
+}
 
 const (
 	posX   = -2
@@ -23,33 +30,71 @@ const (
 
 var img *image.RGBA
 
-func update(screen *ebiten.Image) error {
-	screen.ReplacePixels(img.Pix)
-	return nil
-}
+// func main() {
+// 	log.Println("Initial processing...")
+// 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 
-func main() {
+// 	log.Println("Rendering...")
+
+// 	render()
+
+// 	log.Printf("Opening window size: [%v,%v]\n", imgWidth, imgHeight)
+
+// 	if err := ebiten.Run(update, imgWidth, imgHeight, 1, "Test PAD"); err != nil {
+// 		log.Println(err)
+// 	}
+
+// 	log.Println("Done!")
+// }
+
+func run() {
 	log.Println("Initial processing...")
 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 
+	cfg := pixelgl.WindowConfig{
+		Title:  "Pixel Rocks!",
+		Bounds: pixel.R(0, 0, imgWidth, imgHeight),
+		VSync:  true,
+	}
+
+	win, err := pixelgl.NewWindow(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	// win.Clear(colornames.White)
+
 	log.Println("Rendering...")
 
-	render()
+	drawBuffer := make(chan Pix)
+	render(drawBuffer)
+	draw(drawBuffer)
 
-	log.Printf("Opening window size: [%v,%v]\n", imgWidth, imgHeight)
+	// go ...
 
-	if err := ebiten.Run(update, imgWidth, imgHeight, 1, "Test PAD"); err != nil {
-		log.Println(err)
+	for !win.Closed() {
 	}
 
 	log.Println("Done!")
 }
 
-func render() {
+func main() {
+	pixelgl.Run(run)
+}
+
+func draw(drawBuffer chan Pix) {
+	pic := pixel.PictureDataFromImage(img)
+	sprite := pixel.NewSprite(pic, pic.Bounds())
+	sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
+	win.Update()
+}
+
+func render(drawBuffer chan Pix) {
+	//TODO: dividir em seçoes a partir da quantidade de threads passada por parametro
 	for x := 0; x < imgWidth; x++ {
 		// para cada coluna: 1 go routine (thread - eu acho que o go se gerencia para nao rodar mais threads do que o SO permite)
-		go func(x int) {
-			// para cada ponto x,y processa a cor pelo mandelbrot
+		// para cada ponto x,y processa a cor pelo mandelbrot
+		go func(x int, drawBuffer chan Pix) {
 			for y := 0; y < imgHeight; y++ {
 				var colorR, colorG, colorB int
 				for i := 0; i < samples; i++ {
@@ -66,9 +111,12 @@ func render() {
 				cb = uint8(float64(colorB) / float64(samples))
 
 				// desenha o pixel processado na imagem
-				img.SetRGBA(x, y, color.RGBA{R: cr, G: cg, B: cb, A: 255})
+				// img.SetRGBA(x, y, color.RGBA{R: cr, G: cg, B: cb, A: 255})
+				drawBuffer <- Pix{
+					x: x, y: y, color: color.RGBA{R: cr, G: cg, B: cb, A: 255},
+				}
 			}
-		}(x)
+		}(x, drawBuffer)
 	}
 }
 
