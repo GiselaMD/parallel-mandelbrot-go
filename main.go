@@ -5,19 +5,18 @@ import (
 	"image/color"
 	"log"
 	"math"
-	"sync"
 
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 )
 
-type PixelColor struct {
-	x  int
-	y  int
-	cr uint8
-	cg uint8
-	cb uint8
-}
+// type PixelColor struct {
+// 	x  int
+// 	y  int
+// 	cr uint8
+// 	cg uint8
+// 	cb uint8
+// }
 
 type Pix struct {
 	x  int
@@ -43,9 +42,9 @@ const (
 )
 
 var (
-	img      *image.RGBA
-	mutex    sync.Mutex
-	pixColor PixelColor
+	img *image.RGBA
+	// mutex sync.Mutex
+	// pixColor PixelColor
 )
 
 func run() {
@@ -107,7 +106,7 @@ func render(drawBuffer chan Pix) {
 
 			go func(i, j int, drawBuffer chan Pix) {
 
-				// matrix width
+				// matrix
 				// 1024 / 4
 
 				// 0 - 256
@@ -138,7 +137,7 @@ func render(drawBuffer chan Pix) {
 						// mutex.Lock()
 						// Lock para apenas uma goroutine por vez acessar o data
 						// TODO: Criar matrix de resultado por pixel
-						pixColor = PixelColor{x, y, cr, cg, cb}
+						// pixColor = PixelColor{x, y, cr, cg, cb}
 						// mutex.Unlock()
 						// done <- true
 
