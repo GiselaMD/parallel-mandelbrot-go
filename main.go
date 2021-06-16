@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"math"
+	"time"
 
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
@@ -30,18 +32,26 @@ const (
 	posY   = -1.2
 	height = 2.5
 
-	imgWidth  = 1024
-	imgHeight = 1024
-	maxIter   = 1000
-	samples   = 100
+	imgWidth   = 1024
+	imgHeight  = 1024
+	pixelTotal = imgWidth * imgHeight
 
-	numBlocks  = 16
-	numThreads = 10
+	maxIter = 1000
+	samples = 200
+
+	numBlocks  = 64
+	numThreads = 16
 
 	ratio = float64(imgWidth) / float64(imgHeight)
+
+	showProgress = true
+	closeOnEnd   = false
 )
 
-var img *image.RGBA
+var (
+	img        *image.RGBA
+	pixelCount int
+)
 
 func main() {
 	pixelgl.Run(run)
@@ -49,11 +59,13 @@ func main() {
 
 func run() {
 	log.Println("Initial processing...")
+	pixelCount = 0
 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 	cfg := pixelgl.WindowConfig{
 		Title:  "Parallel Mandelbrot - PAD",
 		Bounds: pixel.R(0, 0, imgWidth, imgHeight),
 		VSync:  true,
+		// Invisible: true,
 	}
 
 	win, err := pixelgl.NewWindow(cfg)
@@ -61,10 +73,10 @@ func run() {
 		panic(err)
 	}
 	log.Println("Rendering...")
-
+	start := time.Now()
 	workBuffer := make(chan WorkItem, numBlocks)
 	threadBuffer := make(chan bool, numThreads)
-	drawBuffer := make(chan Pix, imgWidth*imgHeight)
+	drawBuffer := make(chan Pix, pixelTotal)
 
 	workBufferInit(workBuffer)
 	go workersInit(drawBuffer, workBuffer, threadBuffer)
@@ -75,10 +87,21 @@ func run() {
 		sprite := pixel.NewSprite(pic, pic.Bounds())
 		sprite.Draw(win, pixel.IM.Moved(win.Bounds().Center()))
 		win.Update()
+
+		if showProgress {
+			fmt.Printf("\r%d/%d (%d%%)", pixelCount, pixelTotal, int(100*(float64(pixelCount)/float64(pixelTotal))))
+		}
+
+		if pixelCount == pixelTotal {
+			end := time.Now()
+			fmt.Println("\nFinalizou com tempo = ", end.Sub(start))
+			pixelCount++
+
+			if closeOnEnd {
+				break
+			}
+		}
 	}
-
-	log.Println("Done!")
-
 }
 
 func workBufferInit(workBuffer chan WorkItem) {
@@ -103,6 +126,7 @@ func workersInit(drawBuffer chan Pix, workBuffer chan WorkItem, threadBuffer cha
 
 	for range threadBuffer {
 		workItem := <-workBuffer
+
 		go workerThread(workItem, drawBuffer, threadBuffer)
 	}
 }
@@ -136,6 +160,7 @@ func workerThread(workItem WorkItem, drawBuffer chan Pix, threadBuffer chan bool
 func drawThread(drawBuffer chan Pix, win *pixelgl.Window) {
 	for i := range drawBuffer {
 		img.SetRGBA(i.x, i.y, color.RGBA{R: i.cr, G: i.cg, B: i.cb, A: 255})
+		pixelCount++
 	}
 }
 
