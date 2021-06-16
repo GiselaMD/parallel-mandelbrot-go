@@ -41,17 +41,15 @@ const (
 	ratio = float64(imgWidth) / float64(imgHeight)
 )
 
-var (
-	img            *image.RGBA
-	workingThreads int
-	// mutex sync.Mutex
-	// pixColor PixelColor
-)
+var img *image.RGBA
+
+func main() {
+	pixelgl.Run(run)
+}
 
 func run() {
 	log.Println("Initial processing...")
 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
-	workingThreads = 0
 	cfg := pixelgl.WindowConfig{
 		Title:  "Parallel Mandelbrot - PAD",
 		Bounds: pixel.R(0, 0, imgWidth, imgHeight),
@@ -65,12 +63,12 @@ func run() {
 	log.Println("Rendering...")
 
 	workBuffer := make(chan WorkItem, numBlocks)
-	threadBuffer := make(chan int, numThreads)
+	threadBuffer := make(chan bool, numThreads)
 	drawBuffer := make(chan Pix, imgWidth*imgHeight)
 
-	render(drawBuffer, workBuffer, threadBuffer)
-
-	go draw(drawBuffer, win)
+	workBufferInit(workBuffer)
+	go workersInit(drawBuffer, workBuffer, threadBuffer)
+	go drawThread(drawBuffer, win)
 
 	for !win.Closed() {
 		pic := pixel.PictureDataFromImage(img)
@@ -83,17 +81,33 @@ func run() {
 
 }
 
-func main() {
-	pixelgl.Run(run)
-}
+func workBufferInit(workBuffer chan WorkItem) {
+	var sqrt = int(math.Sqrt(numBlocks))
 
-func draw(drawBuffer chan Pix, win *pixelgl.Window) {
-	for i := range drawBuffer {
-		img.SetRGBA(i.x, i.y, color.RGBA{R: i.cr, G: i.cg, B: i.cb, A: 255})
+	for i := sqrt - 1; i >= 0; i-- {
+		for j := 0; j < sqrt; j++ {
+			workBuffer <- WorkItem{
+				initialX: i * (imgWidth / sqrt),
+				finalX:   (i + 1) * (imgWidth / sqrt),
+				initialY: j * (imgHeight / sqrt),
+				finalY:   (j + 1) * (imgHeight / sqrt),
+			}
+		}
 	}
 }
 
-func workerThread(workItem WorkItem, drawBuffer chan Pix, threadBuffer chan int, threadId int) {
+func workersInit(drawBuffer chan Pix, workBuffer chan WorkItem, threadBuffer chan bool) {
+	for i := 1; i <= numThreads; i++ {
+		threadBuffer <- true
+	}
+
+	for range threadBuffer {
+		workItem := <-workBuffer
+		go workerThread(workItem, drawBuffer, threadBuffer)
+	}
+}
+
+func workerThread(workItem WorkItem, drawBuffer chan Pix, threadBuffer chan bool) {
 	for x := workItem.initialX; x < workItem.finalX; x++ {
 		for y := workItem.initialY; y < workItem.finalY; y++ {
 			var colorR, colorG, colorB int
@@ -116,58 +130,13 @@ func workerThread(workItem WorkItem, drawBuffer chan Pix, threadBuffer chan int,
 
 		}
 	}
-	threadBuffer <- threadId
+	threadBuffer <- true
 }
 
-func render(drawBuffer chan Pix, workBuffer chan WorkItem, threadBuffer chan int) {
-	var sqrt = int(math.Sqrt(numBlocks))
-
-	for i := sqrt - 1; i >= 0; i-- {
-		for j := 0; j < sqrt; j++ {
-
-			// matrix
-			// 1024 / 4
-
-			// 0 - 256
-			// 256 - 512
-			// 512 - 768
-			// 768 - 1023
-
-			workBuffer <- WorkItem{
-				initialX: i * (imgWidth / sqrt),
-				finalX:   (i + 1) * (imgWidth / sqrt),
-				initialY: j * (imgHeight / sqrt),
-				finalY:   (j + 1) * (imgHeight / sqrt),
-			}
-
-		}
+func drawThread(drawBuffer chan Pix, win *pixelgl.Window) {
+	for i := range drawBuffer {
+		img.SetRGBA(i.x, i.y, color.RGBA{R: i.cr, G: i.cg, B: i.cb, A: 255})
 	}
-
-	for i := 1; i <= numThreads; i++ {
-		threadBuffer <- i
-	}
-
-	go func(drawBuffer chan Pix, workBuffer chan WorkItem, threadBuffer chan int) {
-		for thread := range threadBuffer {
-			workItem := <-workBuffer
-			// fmt.Println("workItem", workItem)
-			// fmt.Println("thread", thread)
-			go workerThread(workItem, drawBuffer, threadBuffer, thread)
-		}
-	}(drawBuffer, workBuffer, threadBuffer)
-}
-
-func pixelColor(r float64, iter int) color.RGBA {
-	insideSet := color.RGBA{R: 0, G: 0, B: 0, A: 255}
-
-	// validar se está dentro do conjunto
-	// https://pt.wikipedia.org/wiki/Conjunto_de_Mandelbrot
-	if r > 4 {
-		return hslToRGB(float64(0.70)-float64(iter)/3500*r, 1, 0.5)
-		// return hslToRGB(float64(iter)/100*r, 1, 0.5)
-	}
-
-	return insideSet
 }
 
 func mandelbrotIteraction(a, b float64, maxIter int) (float64, int) {
@@ -185,4 +154,17 @@ func mandelbrotIteraction(a, b float64, maxIter int) (float64, int) {
 	}
 
 	return xx + yy, maxIter
+}
+
+func pixelColor(r float64, iter int) color.RGBA {
+	insideSet := color.RGBA{R: 0, G: 0, B: 0, A: 255}
+
+	// validar se está dentro do conjunto
+	// https://pt.wikipedia.org/wiki/Conjunto_de_Mandelbrot
+	if r > 4 {
+		return hslToRGB(float64(0.70)-float64(iter)/3500*r, 1, 0.5)
+		// return hslToRGB(float64(iter)/100*r, 1, 0.5)
+	}
+
+	return insideSet
 }
