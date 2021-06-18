@@ -62,7 +62,7 @@ func run() {
 	pixelCount = 0
 	img = image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 	cfg := pixelgl.WindowConfig{
-		Title:  "Parallel Mandelbrot - PAD",
+		Title:  "Parallel Mandelbrot in Go",
 		Bounds: pixel.R(0, 0, imgWidth, imgHeight),
 		VSync:  true,
 		// Invisible: true,
@@ -94,7 +94,7 @@ func run() {
 
 		if pixelCount == pixelTotal {
 			end := time.Now()
-			fmt.Println("\nFinalizou com tempo = ", end.Sub(start))
+			fmt.Println("\nFinished with time = ", end.Sub(start))
 			pixelCount++
 
 			if closeOnEnd {
@@ -187,8 +187,8 @@ func pixelColor(r float64, iter int) color.RGBA {
 	// validar se está dentro do conjunto
 	// https://pt.wikipedia.org/wiki/Conjunto_de_Mandelbrot
 	if r > 4 {
-		return hslToRGB(float64(0.70)-float64(iter)/3500*r, 1, 0.5)
-		// return hslToRGB(float64(iter)/100*r, 1, 0.5)
+		// return hslToRGB(float64(0.70)-float64(iter)/3500*r, 1, 0.5)
+		return hslToRGB(float64(iter)/100*r, 1, 0.5)
 	}
 
 	return insideSet
